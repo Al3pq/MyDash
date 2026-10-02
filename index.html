@@ -43,7 +43,8 @@
 
   <script>
     // 1. Indirizzo dell'API Python su Uvicorn
-    const API_URL = "http://localhost:8000/api/libri";
+    // CORRETTO (URL Relativo):
+    const API_URL = "/api/libri";;
 
     // 2. Funzione per chiedere i dati al server Python e creare l'HTML
     async function caricaLibri() {

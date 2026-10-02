@@ -3,6 +3,11 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+
+
+
+
 
 #Inizzializzare applicazione FastAPI
 app = FastAPI(title="MyDash - Reading Tracker API")
@@ -17,6 +22,11 @@ app.add_middleware(
 )
 
 FILE_DATI = "dati.json"
+
+#Configurazione rotta su index
+@app.get("/")
+def home():
+    return FileResponse("index.html")
 
 # MODELLO DATI
 # Definisce la struttura di elemento libro inviato con POST
