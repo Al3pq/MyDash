@@ -35,38 +35,43 @@
       transition: width 0.4s ease-in-out;
     }
   </style>
+  <!-- Libreria per la scansione del codice a barre tramite webcam -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
 
   <h1>📚 MyDash - Reading Tracker</h1>
+
+  <!-- Box Fotocamera / Webcam per scansione ISBN -->
+  <div class="card" style="max-width: 400px; margin-bottom: 25px;">
+    <h3>📷 Scansiona ISBN Libro</h3>
+    <div id="reader"></div>
+    <p id="stato-scansione" style="margin-top: 10px; font-weight: bold;"></p>
+  </div>
+
+  <!-- Contenitore lista libri salvati -->
   <div id="lista-libri">Caricamento libri in corso...</div>
 
   <script>
-    // 1. Indirizzo dell'API Python su Uvicorn
-    // CORRETTO (URL Relativo):
-    const API_URL = "/api/libri";;
+    const API_URL = "/api/libri";
+    let isScanning = false; // Controllo per evitare invii multipli continui
 
-    // 2. Funzione per chiedere i dati al server Python e creare l'HTML
+    // 1. Funzione per chiedere la lista dei libri al server Python e creare l'HTML
     async function caricaLibri() {
       try {
-        // Inviamo la richiesta GET al server Python
         const risposta = await fetch(API_URL);
-        
-        // Trasformiamo la risposta JSON ricevuta in un oggetto JavaScript
         const libri = await risposta.json();
         
         const contenitore = document.getElementById("lista-libri");
         contenitore.innerHTML = ""; // Puliamo il testo di caricamento
 
-        // Se non ci sono libri nel JSON
         if (libri.length === 0) {
           contenitore.innerHTML = "<p>Nessun libro presente.</p>";
           return;
         }
 
-        // Per ogni libro presente nel JSON, creiamo una "card" grafica
         libri.forEach(libro => {
-          const percentuale = Math.round((libro.pagine_lette / libro.pagine_tot) * 100);
+          const percentuale = Math.round((libro.pagine_lette / libro.pagine_tot) * 100) || 0;
           
           const cardHTML = `
             <div class="card">
@@ -83,12 +88,65 @@
 
       } catch (errore) {
         console.error("Errore nel collegamento al server:", errore);
-        document.getElementById("lista-libri").innerText = "Errore durante il collegamento al server Python. Assicurati che Uvicorn sia attivo su localhost:8000.";
+        document.getElementById("lista-libri").innerText = "Errore durante il collegamento al server Python. Assicurati che Uvicorn sia attivo.";
       }
     }
 
-    // Eseguiamo la funzione appena la pagina si carica
+    // 2. Funzione per inviare l'ISBN scansionato al server Python
+    async function inviaISBN(isbn) {
+      // Blocca ulteriori chiamate se c'è già una richiesta in corso
+      if (isScanning) return;
+      isScanning = true;
+
+      const messaggio = document.getElementById("stato-scansione");
+      messaggio.style.color = "#333";
+      messaggio.innerText = `ISBN: ${isbn} - Ricerca informazioni...`;
+
+      try {
+        const risposta = await fetch("/api/libri/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isbn: isbn })
+        });
+
+        const risultato = await risposta.json();
+
+        if (risposta.ok) {
+          messaggio.style.color = "#27ae60";
+          messaggio.innerText = `Aggiunto: "${risultato.libro.titolo}"!`;
+          caricaLibri(); // Ricarica la lista libri aggiornata
+        } else {
+          messaggio.style.color = "#e74c3c";
+          messaggio.innerText = risultato.detail || "Libro non trovato o già presente.";
+        }
+      } catch (errore) {
+        console.error("Errore:", errore);
+        messaggio.style.color = "#e74c3c";
+        messaggio.innerText = "Errore di connessione al server.";
+      } finally {
+        // Pausa di 3 secondi prima di consentire una nuova scansione
+        setTimeout(() => {
+          isScanning = false;
+        }, 3000);
+      }
+    }
+
+    // 3. Attivazione dello scanner webcam
+    function avviaScanner() {
+      const html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", 
+        { fps: 10, qrbox: { width: 250, height: 150 } }, 
+        false
+      );
+
+      html5QrcodeScanner.render((decodedText) => {
+        inviaISBN(decodedText);
+      });
+    }
+
+    // Avvio all'apertura della pagina
     caricaLibri();
+    avviaScanner();
   </script>
 </body>
 </html>

@@ -4,9 +4,8 @@ from pydantic import BaseModel
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-
-
-
+import httpx
+from fastapi import FastAPI, HTTPException
 
 
 #Inizzializzare applicazione FastAPI
@@ -28,15 +27,20 @@ FILE_DATI = "dati.json"
 def home():
     return FileResponse("index.html")
 
-# MODELLO DATI
-# Definisce la struttura di elemento libro inviato con POST
 
+# DEFINIZIONE MODELLI DATI
+
+# Definisce la struttura di elemento libro inviato con POST
 class LibroSchema(BaseModel):
     titolo: str
     autore: str
     pagine_tot: int
     pagine_lette: Optional[int] = 0
     stato: Optional[str] = "In attesa"
+
+# Definisce il dato ISBN
+class ScanISBNRequest(BaseModel):
+    isbn: str
 
 
 # FUNZIONI UTILI JSON
@@ -46,7 +50,7 @@ def carica_dati():
 
 def salva_dati(dati):
     with open(FILE_DATI, "w", encoding="utf-8") as file:
-        json.dump(dati, file, indent=2, ensure_ascii=false)
+        json.dump(dati, file, indent=2, ensure_ascii=False)
 
 
 # ROTTE API
@@ -55,6 +59,7 @@ def salva_dati(dati):
 def get_libri():
     dati = carica_dati()
     return dati["libri"]
+
 
 # Endpoint 2: aggiungere un libro -> POST
 @app.post("/api/libri")
@@ -74,3 +79,60 @@ def crea_libro(libro: LibroSchema):
     salva_dati(dati)
 
     return {"message":"Libro aggiunto con successo", "libro": nuovo_libro}
+
+
+# Endpoint 3: scansione ISBN e recupereo dati da Open Library -> POST
+@app.post("/api/libri/scan")
+async def aggiungi_libro_ISBN(req: ScanISBNRequest):
+    # Pulizia dati ISBN input da trattini o spazi
+    isbn = req.isbn.strip().replace("-","")
+
+    # Invoco API pubblica OpenLibrary
+    url = f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data"
+
+    # Creazione client e richiesta HTTP
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+
+    dati_api = response.json()
+    chiave_libro = f"ISBN:{isbn}"
+
+    # Gestione errore mancato ritrovamento libro
+    if chiave_libro not in dati_api:
+        raise HTTPException(
+            status_code=404,
+            detail = f"Nessun libro trovato con ISBN: {isbn}"
+        )
+
+    info_libro = dati_api[chiave_libro]
+
+    # Estraggo dati inserendo default e unione autori se molteplici
+    titolo = info_libro.get("title", "Titolo sconosciuto")
+    autori = [a["name"] for a in info_libro.get("authors", [])]
+    autore = ", ".join(autori) if autori else "Autore sconosciuto"
+    pagine_tot = info_libro.get("number_of_pages", 0)
+
+    # Leggo database JSON esistente
+    dati = carica_dati()
+    #calcolo id sequenziale
+    nuovo_id = len(dati["libri"]) + 1 if dati["libri"] else 1
+
+    # Creo scheda libro da inserire
+    nuovo_libro= {
+        "id": nuovo_id,
+        "titolo": titolo,
+        "autore": autore,
+        "pagine_tot": pagine_tot,
+        "pagine_lette": 0,
+        "stato": "In attesa",
+        "voto": None
+    }
+
+    # salvataggio su file json
+    dati["libri"].append(nuovo_libro)
+    salva_dati(dati)
+
+    return {
+        "message": "Libro trovato e aggiunto",
+        "libro": nuovo_libro
+    }
