@@ -1,0 +1,13 @@
+#Cartelle
+    venv/
+
+#File temporanei di python
+    __pycache__/
+    *.pyc
+
+#File ambientali
+    .env
+
+#File di sistema
+    .Ds_Store
+    Thumbs.db
