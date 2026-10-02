@@ -1,0 +1,34 @@
+{
+    "libri": [
+        {
+            "id": 1,
+            "titolo": "Storie di fantasmi",
+            "autore": "Edith Wharton",
+            "pagine_tot": 283,
+            "pagine_lette": 0,
+            "stato": "In attesa",
+            "voto": null
+            
+        },
+
+        {
+            "id": 2,
+            "titolo": "L'albergo stregato",
+            "autore": "Wilkie Collins",
+            "pagine_tot": 188,
+            "pagine_lette": 144,
+            "stato": "In corso",
+            "voto": null           
+        },
+
+        {
+            "id": 3,
+            "titolo": "Oceano rosso",
+            "autore": "Han Song",
+            "pagine_tot": 390,
+            "pagine_lette": 390,
+            "stato": "Completato",
+            "voto": 6.5          
+        }
+    ]
+}
